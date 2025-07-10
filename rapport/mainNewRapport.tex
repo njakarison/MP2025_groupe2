@@ -1,0 +1,322 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{geometry}
+\geometry{margin=2.5cm}
+\usepackage{graphicx}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{titlesec}
+\usepackage{parskip}
+\usepackage{tocloft}
+\usepackage[french]{babel} % Ajout du package babel pour le français
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{1em}
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    numbers=left,
+    numberstyle=\tiny,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray}
+}
+
+\begin{document}
+
+% Page de garde
+\begin{titlepage}
+    \centering
+    
+    \begin{minipage}{0.15\textwidth}
+        \includegraphics[width=\linewidth]{images/couverture/logo-espa-1.png}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.6\textwidth}
+        \centering
+        \textsc{\large République de Madagascar} \\
+        \textsc{Fitiavana – Tanindrazana – Fandrosoana} \\[0.2cm]
+        \textsc{Ministère de l'Enseignement Supérieur et de la Recherche Scientifique}
+    \end{minipage}
+    \hfill
+    \begin{minipage}{0.15\textwidth}
+        \includegraphics[width=\linewidth]{images/couverture/logo-una.png}
+    \end{minipage}
+    
+    \vspace{1cm}
+    {\large Mention STIC}\\
+    
+    \vspace{2cm}
+    {\Huge \textbf{Rapport de Mini-Projet}}\\
+    \vspace{1cm}
+    {\LARGE Installation et Configuration Automatisée d'un Serveur Mail sur Debian avec VirtualBox et Docker}\\
+    \vspace{2cm}
+    {\large Réalisé par :}\\
+    \vspace{0.5cm}   
+    {\normalsize KOURAICHI Ali}\\
+    {\normalsize ANDRY Nizwami Ibrahim}\\
+    {\normalsize TILAHIZAFY Judicael Roberto}\\
+    {\normalsize ANDRIAMANDIGNY Ali Rueff Suharto}\\
+    \vspace{1cm}
+    {\large Encadré par :}\\
+    \vspace{0.5cm}
+    {\normalsize RANDRIAMASINORO Njakarison Menja}\\
+    \vspace{2cm}
+    {\large Année Universitaire 2024-2025}\\
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section{Introduction}
+
+\subsection{Objectifs du Projet}
+L'objectif de ce projet était d'établir un serveur de messagerie entièrement fonctionnel sur un système Debian dans une machine virtuelle VirtualBox, en utilisant Postfix comme Agent de Transport de Courrier (MTA), Dovecot pour les protocoles IMAP et POP3, et Thunderbird comme client de messagerie à la place de Roundcube. Les processus d'installation et de configuration ont été automatisés à l'aide d'un script Bash, et le système a été conteneurisé avec Docker pour assurer la portabilité. Le projet visait également à implémenter des mesures de sécurité robustes, incluant les certificats SSL/TLS, SPF, DKIM, et DMARC, et à valider la configuration par des tests complets.
+
+\subsection{Portée du Projet}
+Ce rapport détaille la création de l'environnement virtuel, l'installation et la configuration des composants du serveur de messagerie, l'automatisation de l'installation, les configurations de sécurité, les tests, et la conteneurisation Docker. Il aborde également les défis rencontrés durant le projet et les leçons apprises. Les livrables incluent un dépôt GitHub, un script Bash, un Dockerfile, et ce rapport LaTeX.
+
+\section{Configuration de l'Environnement}
+
+\subsection{Installation de VirtualBox et Debian}
+Nous avons installé Oracle VirtualBox 7.0 sur une machine hôte exécutant Ubuntu 24.04. Une machine virtuelle a été créée avec 2 Go de RAM, 20 Go de stockage, et un adaptateur réseau en mode pont pour permettre l'accès externe. Debian 12 (Bookworm) a été installé en utilisant l'ISO officiel depuis \url{https://www.debian.org/doc/}.
+
+\textbf{Défi Rencontré} : Durant l'installation de VirtualBox, nous avons rencontré des problèmes de compatibilité avec la version du noyau du système hôte, ce qui a nécessité la mise à jour de VirtualBox vers la dernière version et l'installation du pack d'extensions approprié. De plus, l'installation initiale de Debian a échoué à cause d'une configuration réseau incorrecte, nous obligeant à passer du mode NAT à un adaptateur en mode pont.
+
+\subsection{Configuration de la Machine Virtuelle}
+Le système Debian a été configuré avec une adresse IP statique (192.168.1.100) et le nom d'hôte \texttt{mailserver.local}. Nous avons mis à jour le système en utilisant :
+\begin{lstlisting}[language=bash]
+sudo apt update && sudo apt upgrade -y
+\end{lstlisting}
+Des outils essentiels comme \texttt{vim}, \texttt{net-tools}, et \texttt{curl} ont été installés pour faciliter les configurations ultérieures.
+
+\section{Installation et Configuration du Serveur Mail}
+
+\subsection{Configuration de Postfix}
+Postfix a été installé comme MTA en utilisant :
+\begin{lstlisting}[language=bash]
+sudo apt install postfix -y
+\end{lstlisting}
+Nous avons configuré Postfix pour fonctionner comme un site Internet, définissant le domaine à \texttt{mailserver.local}. Le fichier de configuration principal \texttt{/etc/postfix/main.cf} a été modifié pour inclure :
+\begin{lstlisting}
+myhostname = mailserver.local
+mydomain = mailserver.local
+mydestination = $myhostname, localhost.$mydomain, localhost
+inet_interfaces = all
+inet_protocols = ipv4
+\end{lstlisting}
+
+\subsubsection{Test d'envoie d'email}
+\subsubsection*{Creation d'utilisateur}
+Pour creer un utilisateur pour le test, nous avons utiliser les commandes suivantes:
+\begin{lstlisting}[language=bash]
+sudo adduser Ibra
+sudo passwd Ibra
+\end{lstlisting}
+
+%\begin{minipage}{0.15\textwidth}
+%\includegraphics[width=\linewidth]{images/couverture/logo-espa-1.png}
+%\end{minipage}
+
+
+\subsubsection{Installation de mailUtils}
+
+Avant de pouvoir envoyer des e-mails en ligne de commande (ex. pour les tests SMTP avec mail, les scripts système ou la supervision), il est essentiel d’installer le paquet mailutils, qui fournit la commande mail et ses dépendances.
+
+\begin{lstlisting}[language=bash]
+sudo apt update
+sudo apt install mailutils -y
+\end{lstlisting}
+
+ Mailutils est un ensemble d'utilitaires robustes permettant de composer, envoyer, recevoir et lire des e-mails directement depuis le terminal. Indispensable pour tester rapidement la configuration de Postfix ou automatiser l’envoi d’e-mails système.
+ 
+\subsubsection{Envoi d’un e-mail}
+% Description : Envoi d’un e-mail de test à l’utilisateur Ibra en utilisant la commande mail
+
+Pour envoyer un e-mail à l’utilisateur \texttt{Ibra} sur le serveur de messagerie, utilisez la commande \texttt{mail} fournie par le paquet \texttt{mailutils}. Exécutez la commande suivante :
+
+\begin{lstlisting}[language=bash]
+echo "Bonjour j'ai une message pour toi" | mail -s "message de test" ibra
+
+\end{lstlisting}
+
+% Remarque : Remplacez mailserver.local par votre nom de domaine réel si celui-ci est configuré
+
+L’e-mail sera livré à la boîte de réception de l’utilisateur Ibra, généralement située dans le répertoire \texttt{/home/ibra/Maildir/new}.
+Pour vérifier la bonne réception du message, exécutez :
+
+\begin{lstlisting}[language=bash]
+ls -l /home/ibra/Maildir/new
+\end{lstlisting}
+
+% Les journaux permettent de suivre l’état de la livraison
+Vous pouvez également consulter les journaux du serveur de messagerie pour confirmer la livraison :
+
+\begin{lstlisting}[language=bash]
+tail -f /var/log/mail.log
+\end{lstlisting}
+ 
+ 
+
+\textbf{Défi Rencontré} : La configuration initiale de Postfix causait le rejet des emails à cause d'un paramètre \texttt{mydestination} mal configuré, qui incluait un domaine incorrect. Cela a été résolu en consultant la documentation Postfix et en vérifiant les paramètres de domaine.
+
+\subsection{Configuration de Dovecot}
+Dovecot a été installé pour gérer les protocoles IMAP et POP3 :
+\begin{lstlisting}[language=bash]
+sudo apt install dovecot-core dovecot-imapd dovecot-pop3d -y
+\end{lstlisting}
+Le fichier de configuration \texttt{/etc/dovecot/dovecot.conf} a été mis à jour pour activer IMAP et POP3 :
+\begin{lstlisting}
+protocols = imap pop3
+\end{lstlisting}
+L'authentification des utilisateurs a été configurée en utilisant la base de données utilisateurs du système, et les boîtes aux lettres ont été configurées pour utiliser le format Maildir.
+
+\textbf{Défi Rencontré} : Dovecot a initialement échoué à démarrer à cause d'un problème de permissions sur le répertoire des boîtes aux lettres. Nous avons résolu cela en ajustant les permissions en utilisant :
+\begin{lstlisting}[language=bash]
+sudo chmod -R 700 /var/mail
+\end{lstlisting}
+
+\subsection{Thunderbird comme Client de Messagerie}
+Thunderbird a été choisi comme client de messagerie à la place de Roundcube pour tester le serveur de messagerie localement. Il a été installé sur la machine hôte :
+\begin{lstlisting}[language=bash]
+sudo apt install thunderbird -y
+\end{lstlisting}
+Thunderbird a été configuré pour se connecter au serveur de messagerie en utilisant IMAP (port 143) et SMTP (port 25) avec l'adresse serveur \texttt{192.168.1.100}. Les comptes utilisateurs ont été configurés avec des identifiants correspondant aux utilisateurs du système Debian.
+
+\textbf{Défi Rencontré} : Thunderbird a échoué à se connecter au serveur à cause d'un pare-feu bloquant les ports 143 et 25. Nous avons ouvert ces ports en utilisant :
+\begin{lstlisting}[language=bash]
+sudo ufw allow 143
+sudo ufw allow 25
+\end{lstlisting}
+
+\subsubsection{Connexion à Thunderbird}
+Pour ajouter un compte à Thunderbird, on dois configurer un serveur entrant et un serveur sortant :
+
+\begin{center}
+   \begin{tabular}{ | l | c | }
+     \hline
+     Serveur entrant & localhost \\ \hline
+     Port & 143(IMAP)  \\ \hline
+     Sécurité & Aucune  \\
+     Authentification & Mot de passe normal  \\
+     Nom d'utilisateur & ibra  \\
+     \hline
+   \end{tabular}
+ \end{center}
+
+\section{Configuration de Sécurité}
+
+\subsection{Implémentation SSL/TLS}
+Pour sécuriser les communications, nous avons généré un certificat SSL/TLS auto-signé en utilisant OpenSSL :
+\begin{lstlisting}[language=bash]
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+-keyout /etc/ssl/private/dovecot.pem \
+-out /etc/ssl/certs/dovecot.pem
+\end{lstlisting}
+Postfix et Dovecot ont été configurés pour utiliser ces certificats en mettant à jour leurs fichiers de configuration respectifs.
+
+\section{Automatisation avec Script Bash}
+
+Un script Bash a été développé pour automatiser l'installation et la configuration de Postfix, Dovecot, et des paramètres de sécurité. Voici le script :
+
+\begin{lstlisting}[language=bash]
+#!/bin/bash
+# Script d'Installation Automatisée du Serveur Mail
+
+# Mise à jour du système
+sudo apt update && sudo apt upgrade -y
+
+# Installation de Postfix
+sudo DEBIAN_FRONTEND=noninteractive apt install postfix -y
+sudo postconf -e "myhostname = mailserver.local"
+sudo postconf -e "mydestination = \$myhostname, localhost.\$mydomain, localhost"
+sudo postconf -e "inet_interfaces = all"
+
+# Installation de Dovecot
+sudo apt install dovecot-core dovecot-imapd dovecot-pop3d -y
+sudo sed -i 's/#protocols = imap pop3/protocols = imap pop3/' /etc/dovecot/dovecot.conf
+
+# Installation d'OpenSSL et génération des certificats
+sudo apt install openssl -y
+sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+-keyout /etc/ssl/private/dovecot.pem \
+-out /etc/ssl/certs/dovecot.pem \
+-subj "/CN=mailserver.local"
+
+
+# Redémarrage des services
+sudo systemctl restart postfix dovecot 
+
+echo "Installation du serveur mail terminée."
+\end{lstlisting}
+
+\textbf{Défi Rencontré} : Le script a initialement échoué à gérer les erreurs quand une installation de paquet était interrompue à cause de problèmes réseau. Nous avons ajouté une vérification d'erreurs et une logique de nouvelle tentative pour assurer la robustesse.
+
+\section{Tests et Validation}
+
+\subsection{Fonctionnalité de Messagerie}
+Nous avons testé l'envoi et la réception d'emails en utilisant Thunderbird. Les emails ont été envoyés avec succès de \texttt{vbox@mailserver.local} vers \texttt{ibra@mailserver.local}. L'accès IMAP et POP3 a été vérifié en récupérant les emails dans Thunderbird.
+
+
+\section{Conteneurisation Docker}
+
+Un Dockerfile a été créé pour conteneuriser le serveur de messagerie :
+
+\begin{lstlisting}[language=bash]
+FROM debian:bookworm
+
+# Installation des paquets nécessaires
+RUN apt update && apt install -y \
+    postfix \
+    dovecot-core \
+    dovecot-imapd \
+    dovecot-pop3d \
+    openssl \
+    opendkim \
+    opendkim-tools \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copie du script de configuration
+COPY mailserver_setup.sh /mailserver_setup.sh
+RUN chmod +x /mailserver_setup.sh
+
+# Création des utilisateurs nécessaires
+RUN groupadd -r mail && useradd -r -g mail mail
+
+# Exposition des ports
+EXPOSE 25 143 587 993
+
+# Commande de démarrage
+CMD ["/mailserver_setup.sh"]
+\end{lstlisting}
+
+L'image a été construite et testée en utilisant :
+\begin{lstlisting}[language=bash]
+docker build -t mailserver:latest .
+docker run -d -p 25:25 -p 143:143 -p 587:587 -p 993:993 mailserver:latest
+\end{lstlisting}
+
+\textbf{Défi Rencontré} : En ce qui concerne notre images docker, on a pas encore pu le tester correctement, car pendant le premier teste on a rencontrer des problème de connexion.
+
+\section{Documentation et Dépôt GitHub}
+
+Le projet a été documenté dans un dépôt GitHub nommé "Serveur-Mail-sur-Debian" à l'adresse \url{https://github.com/njakarison/MP2025_groupe2}. Tous les membres de l'équipe ont créé des comptes GitHub et ont reçu l'accès, ainsi que le superviseur (\texttt{njakarison@gmail.com}). Le dépôt inclut le script Bash, le Dockerfile, et les fichiers de configuration.
+
+\section{Conclusion}
+
+Le projet a réussi à établir un serveur de messagerie sécurisé et automatisé sur Debian en utilisant Postfix, Dovecot, et Thunderbird. Malgré les défis tels que les problèmes de configuration réseau, les erreurs de permissions, et les problèmes de configuration DKIM, l'équipe a résolu ces problèmes par un débogage systématique et la consultation de la documentation. Le script d'automatisation et l'image Docker assurent un déploiement facile, rendant le système portable et évolutif.
+
+\section{Références}
+
+\begin{itemize}
+    \item Documentation Debian : \url{https://www.debian.org/doc/}
+    \item Documentation Postfix : \url{http://www.postfix.org/documentation.html}
+    \item Documentation Dovecot : \url{https://doc.dovecot.org/}
+    \item Documentation Docker : \url{https://docs.docker.com/}
+    \item Guide de Script Bash : \url{https://linuxcommand.org/tlcl.php}
+    \item Tutoriel Git : \url{https://www.hostinger.fr/tutoriels/tuto-git}
+\end{itemize}
+
+\end{document}
